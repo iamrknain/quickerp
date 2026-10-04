@@ -1,4 +1,5 @@
 import { StorageService } from './StorageService.js';
+import { ERP_CONFIG } from '../config/constants.js';
 
 export class CredentialService {
 
@@ -77,19 +78,18 @@ export class CredentialService {
         if (!session) return false;
         
         try {
-            // Use stored ssoToken to validate session 
-            const validateUrl = `https://erp.iitkgp.ac.in/IIT_ERP3/welcome.jsp?ssoToken=${session.ssoToken}`;
-            
-            const response = await fetch(validateUrl, {
+            // Fetch the ERP homepage. If the session is valid, the server will serve
+            // the authenticated page and response.url will stay on IIT_ERP3.
+            // If the session expired, the server redirects back to the SSO login page
+            // (SSOAdministration/login.htm), so response.url will contain 'SSOAdministration'.
+            const response = await fetch(ERP_CONFIG.HOMEPAGE_URL, {
                 method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
+                credentials: 'include'
             });
             
-            // Check content length 
-            const contentLength = response.headers.get('Content-Length');
-            return contentLength === '1034';
+            const finalUrl = response.url || '';
+            // If we stayed on IIT_ERP3 (not redirected to SSO login), session is valid
+            return finalUrl.includes('IIT_ERP3') && !finalUrl.includes('SSOAdministration');
         } catch (error) {
             console.error('Failed to validate ERP session:', error);
             return false;

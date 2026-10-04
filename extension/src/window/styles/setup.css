@@ -1,5 +1,47 @@
 /* Setup Screen Styles */
 
+/* Import Profile option on Step 1 */
+.setup-import-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 12px;
+    color: rgba(255, 255, 255, 0.25);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.setup-import-divider::before,
+.setup-import-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.setup-import-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px dashed rgba(0, 212, 255, 0.25);
+    border-radius: 10px;
+    color: rgba(0, 212, 255, 0.6);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.2px;
+}
+
+.setup-import-btn:hover {
+    background: rgba(0, 212, 255, 0.06);
+    border-color: rgba(0, 212, 255, 0.45);
+    color: #00d4ff;
+    transform: translateY(-1px);
+}
+
 /* Gmail requirement notice */
 .gmail-requirement {
     margin-top: 12px;

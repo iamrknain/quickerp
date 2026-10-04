@@ -109,8 +109,6 @@ export class GmailService {
                 if (response.ok) {
                     const userInfo = await response.json();
                     return userInfo;
-                } else {
-                    const errorText = await response.text();
                 }
             } catch (error) {
                 console.log('Endpoint failed:', endpoint, error);
@@ -240,10 +238,10 @@ export class GmailService {
         }
     }
 
-    static async getLatestOTP(maxAttempts = 10, intervalMs = 5000, onProgress = null) {
+    static async getLatestOTP(maxAttempts = 10, intervalMs = 5000, onProgress = null, requestTime = null) {
         const query = GMAIL_CONFIG.OTP_SEARCH_QUERY;
         const startTime = Date.now();
-        const otpRequestTime = Date.now();
+        const minTime = requestTime ? requestTime - 60000 : Date.now() - 60000; // Allow 60s clock skew
         
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
@@ -275,6 +273,14 @@ export class GmailService {
                     
                     try {
                         const emailContent = await this.getEmailContent(latestMessage.id);
+                        
+                        // Ensure we don't pick up an old OTP email from a previous login attempt
+                        const emailDate = parseInt(emailContent.internalDate);
+                        if (emailDate < minTime) {
+                            console.log('Skipping old OTP email from before this login attempt.');
+                            throw new Error('Old OTP email'); 
+                        }
+                        
                         const otp = this.extractOTPFromEmail(emailContent);
                         
                         if (otp) {
@@ -374,11 +380,4 @@ export class GmailService {
         }
     }
 
-    static async reloadExtension() {
-        try {
-            chrome.runtime.reload();
-        } catch (error) {
-            console.error('Failed to reload extension:', error);
-        }
-    }
 }

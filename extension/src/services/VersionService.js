@@ -50,7 +50,7 @@ export class VersionService {
             isOutdated: !isLatest,
             isCritical: !isSupported,
             downloadUrl: data.downloadUrl,
-            changelog: data.changelog[data.latestVersion] || {},
+            changelog: data.changelog?.[data.latestVersion] || {},
             notifications: this.getActiveNotifications(data.notifications || []),
             support: data.support
         };

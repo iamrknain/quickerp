@@ -191,7 +191,6 @@ export class DashboardController {
         const viewCredentialsBtn = document.getElementById('view-credentials-btn');
         viewCredentialsBtn?.addEventListener('click', async (e) => {
             e.preventDefault();
-            console.log('View credentials button clicked');
             await this.showERPCredentialsDialog();
         });
 
@@ -374,8 +373,6 @@ export class DashboardController {
 
             this.app.showSuccess('Opening ERP with saved session...');
 
-            // Open ERP with stored session tokens
-            const { ERPApiService } = await import('../services/ERPApiService.js');
             await ERPApiService.openAuthenticatedERP(session);
 
         } catch (error) {
@@ -561,11 +558,10 @@ export class DashboardController {
 
     async openERPPortal(result) {
         try {
-            let url = ERP_CONFIG.HOMEPAGE_URL;
-
-            if (result?.ssoToken) {
-                url += `?ssoToken=${result.ssoToken}`;
-            }
+            // The ERP session is maintained via browser cookies set during the fetch-based
+            // login flow. Just open the homepage — the browser cookies handle auth.
+            // NOTE: Passing ssoToken as a URL parameter does NOT work for IIT_ERP3/.
+            const url = ERP_CONFIG.HOMEPAGE_URL;
 
             // Try to send message to background script to open new tab
             try {

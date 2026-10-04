@@ -7,12 +7,8 @@ export class SetupController {
     constructor(app) {
         this.app = app;
         this.currentStep = 1;
-        this.totalSteps = 3;
         this.SECURITY_QUESTIONS_COUNT = 3;
         this.userData = {};
-        this.credentialService = new CredentialService();
-        this.storageService = new StorageService();
-        this.gmailService = new GmailService();
     }
 
     async init() {
@@ -68,7 +64,7 @@ export class SetupController {
                 statusElement.title = tooltip;
                 statusElement.style.cursor = 'pointer';
                 statusElement.addEventListener('click', () => {
-                    const updateUrl = `${versionInfo.support?.website || 'https://quickerp.rknain.com'}/updates/v${versionInfo.latestVersion}`;
+                    const updateUrl = versionInfo.downloadUrl || versionInfo.support?.website || 'https://quickerp.rknain.com';
                     window.open(updateUrl, '_blank');
                 });
             } else if (statusElement) {
@@ -102,10 +98,8 @@ export class SetupController {
         credentialsForm?.addEventListener('submit', (e) => this.handleCredentialsSubmit(e));
         securityForm?.addEventListener('submit', (e) => this.handleSecuritySubmit(e));
         document.getElementById('gmail-connect')?.addEventListener('click', () => this.handleGmailConnect());
-        document.getElementById('reload-extension')?.addEventListener('click', () => this.handleReloadExtension());
         document.getElementById('add-security-question')?.addEventListener('click', () => this.addSecurityQuestion());
         document.getElementById('password-toggle')?.addEventListener('click', () => this.togglePasswordVisibility());
-        document.getElementById('finish-setup')?.addEventListener('click', () => this.handleFinishSetup());
         document.getElementById('back-btn')?.addEventListener('click', () => this.previousStep());
         document.getElementById('next-btn')?.addEventListener('click', () => this.handleNextStep());
         
@@ -163,17 +157,11 @@ export class SetupController {
             
             this.userData.securityQuestions = questions.map(question => ({
                 question: question,
-                answer: '' 
+                answer: '',
+                isFetched: true
             }));
             await this.saveSetupData();
             this.nextStep();
-            
-            // Mark that these were just fetched so we show them in readonly format
-            setTimeout(() => {
-                if (document.querySelector('.step[data-step="2"].active')) {
-                    this.loadFetchedSecurityQuestions();
-                }
-            }, 100);
             
         } catch (error) {
             console.error('Failed to fetch security questions:', error);
@@ -182,30 +170,7 @@ export class SetupController {
             // Fall back to manual entry
             this.userData.securityQuestions = [];
             await this.saveSetupData();
-            this.loadSecurityQuestions();
             this.showStep(2);
-        }
-    }
-    
-    handleNextClick() {
-        const currentStepEl = document.querySelector('.step.active');
-        const stepNum = parseInt(currentStepEl.dataset.step);
-        
-        if (stepNum === 1) {
-            document.getElementById('credentials-form').dispatchEvent(new Event('submit'));
-        } else if (stepNum === 2) {
-            document.getElementById('security-form').dispatchEvent(new Event('submit'));
-        } else if (stepNum === 3) {
-            this.handleGmailConnect();
-        } else if (stepNum === 4) {
-            this.handleFinishSetup();
-        }
-    }
-    
-    previousStep() {
-        if (this.currentStep > 1) {
-            this.currentStep--;
-            this.showStep(this.currentStep);
         }
     }
 
@@ -221,42 +186,20 @@ export class SetupController {
         `;
     }
 
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/"/g, '&quot;');
+    }
+
     loadFetchedSecurityQuestions() {
-        const container = document.querySelector('.security-questions');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (this.userData.securityQuestions && this.userData.securityQuestions.length > 0) {
-            this.userData.securityQuestions.forEach((qa, index) => {
-                const questionDiv = document.createElement('div');
-                questionDiv.className = 'security-question-card fetched';
-                questionDiv.innerHTML = `
-                    <div class="card-header">
-                        <span class="question-number">Q${index + 1}</span>
-                        <span class="fetched-badge">📥 Auto-fetched</span>
-                    </div>
-                    <div class="question-field">
-                        <label>Security Question</label>
-                        <div class="readonly-question">${qa.question}</div>
-                    </div>
-                    <div class="answer-field">
-                        <label>Your Answer</label>
-                        <input type="text" class="security-answer" placeholder="Enter your answer" required>
-                    </div>
-                `;
-                container.appendChild(questionDiv);
-            });
-        }
+        this.prefillSecurityQuestions();
     }
 
     loadSecurityQuestions() {
         const container = document.querySelector('.security-questions');
         if (!container) return;
-        
-        if (container.children.length > 0 && this.userData.securityQuestions) {
-            return;
-        }
         
         container.innerHTML = '';
         
@@ -358,7 +301,6 @@ export class SetupController {
 
     prefillSecurityQuestions() {
         const container = document.querySelector('.security-questions');
-        
         if (!container || !this.userData.securityQuestions) {
             return;
         }
@@ -366,34 +308,47 @@ export class SetupController {
         container.innerHTML = '';
         
         this.userData.securityQuestions.forEach((qa, index) => {
-            
             const questionDiv = document.createElement('div');
-            questionDiv.className = 'security-question-card';
-            questionDiv.innerHTML = `
-                <div class="card-header">
-                    <span class="question-number">Q${index + 1}</span>
-                    <button type="button" class="remove-question">&times;</button>
-                </div>
-                <div class="question-field">
-                    <label>Security Question</label>
-                    <input type="text" class="security-question" required>
-                </div>
-                <div class="answer-field">
-                    <label>Answer</label>
-                    <input type="text" class="security-answer" required>
-                </div>
-            `;
-             
-            const questionInput = questionDiv.querySelector('.security-question');
-            const answerInput = questionDiv.querySelector('.security-answer');
-            questionInput.value = qa.question || '';
-            answerInput.value = qa.answer || '';
             
-            const removeBtn = questionDiv.querySelector('.remove-question');
-            removeBtn.addEventListener('click', () => {
-                questionDiv.remove();
-                this.updateQuestionNumbers();
-            });
+            if (qa.isFetched) {
+                questionDiv.className = 'security-question-card fetched';
+                questionDiv.innerHTML = `
+                    <div class="card-header">
+                        <span class="question-number">Q${index + 1}</span>
+                        <span class="fetched-badge">📥 Auto-fetched</span>
+                    </div>
+                    <div class="question-field">
+                        <label>Security Question</label>
+                        <div class="readonly-question">${this.escapeHtml(qa.question)}</div>
+                    </div>
+                    <div class="answer-field">
+                        <label>Your Answer</label>
+                        <input type="text" class="security-answer" placeholder="Enter your answer" value="${this.escapeHtml(qa.answer || '')}" required>
+                    </div>
+                `;
+            } else {
+                questionDiv.className = 'security-question-card';
+                questionDiv.innerHTML = `
+                    <div class="card-header">
+                        <span class="question-number">Q${index + 1}</span>
+                        <button type="button" class="remove-question">&times;</button>
+                    </div>
+                    <div class="question-field">
+                        <label>Security Question</label>
+                        <input type="text" class="security-question" placeholder="Enter security question" value="${this.escapeHtml(qa.question || '')}" required>
+                    </div>
+                    <div class="answer-field">
+                        <label>Answer</label>
+                        <input type="text" class="security-answer" placeholder="Your answer" value="${this.escapeHtml(qa.answer || '')}" required>
+                    </div>
+                `;
+                
+                const removeBtn = questionDiv.querySelector('.remove-question');
+                removeBtn.addEventListener('click', () => {
+                    questionDiv.remove();
+                    this.updateQuestionNumbers();
+                });
+            }
             
             container.appendChild(questionDiv);
         });
@@ -428,23 +383,22 @@ export class SetupController {
         const securityQuestions = [];
         const cards = document.querySelectorAll('.security-question-card');
         
-        cards.forEach((card, index) => {
-            let question, answer;
+        cards.forEach((card) => {
+            let question, answer, isFetched;
             
-            // Check if this is a fetched question (readonly) or manual entry
             const readonlyQuestion = card.querySelector('.readonly-question');
             if (readonlyQuestion) {
-                // Fetched question - get question from readonly div and answer from input
                 question = readonlyQuestion.textContent.trim();
-                answer = card.querySelector('.security-answer').value.trim();
+                answer = card.querySelector('.security-answer')?.value?.trim() || '';
+                isFetched = true;
             } else {
-                // Manual entry - get both from inputs
-                question = card.querySelector('.security-question').value.trim();
-                answer = card.querySelector('.security-answer').value.trim();
+                question = card.querySelector('.security-question')?.value?.trim() || '';
+                answer = card.querySelector('.security-answer')?.value?.trim() || '';
+                isFetched = false;
             }
             
             if (question && answer) {
-                securityQuestions.push({ question, answer });
+                securityQuestions.push({ question, answer, isFetched });
             }
         });
         
@@ -555,11 +509,9 @@ export class SetupController {
             }
         }
 
-        if (step === 2 && this.userData.securityQuestions) {
+        if (step === 2) {
             setTimeout(() => {
-                // Always use prefillSecurityQuestions for locally stored questions
-                // Only use loadFetchedSecurityQuestions when questions were just fetched in this session
-                this.prefillSecurityQuestions();
+                this.loadSecurityQuestions();
             }, 50);
         } else if (step === 3) {
             setTimeout(() => {

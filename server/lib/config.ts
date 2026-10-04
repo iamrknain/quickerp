@@ -9,7 +9,7 @@ export const config = {
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL! || 'quickerp@rknain.com',
   },
   github: {
-    url: process.env.NEXT_PUBLIC_GITHUB_URL! || 'https://github.com/quickerp',
+    url: process.env.NEXT_PUBLIC_GITHUB_URL! || 'https://github.com/iamrknain/quickerp',
   },
   extension: {
     url: process.env.NEXT_PUBLIC_EXTENSION_URL! || 'https://chromewebstore.google.com/detail/quickerp/gafmfinhhfaocnchccamogkeemjfboin',

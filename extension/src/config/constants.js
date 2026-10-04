@@ -4,6 +4,7 @@ export const ERP_CONFIG = {
     LOGIN_URL: 'https://erp.iitkgp.ac.in/SSOAdministration/auth.htm',
     SECURITY_URL: 'https://erp.iitkgp.ac.in/SSOAdministration/getSecurityQues.htm',
     OTP_URL: 'https://erp.iitkgp.ac.in/SSOAdministration/getEmilOTP.htm',
+    VERIFY_URL: 'https://erp.iitkgp.ac.in/SSOAdministration/auth.htm',
     WELCOMEPAGE_URL: 'https://erp.iitkgp.ac.in/IIT_ERP3/welcome.jsp',
     DASHBOARD_URL:   'https://erp.iitkgp.ac.in/IIT_ERP3/home.jsp'
 };
@@ -35,9 +36,9 @@ export const UI_CONFIG = {
 
 
 export const GITHUB_CONFIG = {
-    REPOSITORY_URL: 'https://github.com/ravi-ivar-7/quickerp',
-    ISSUES_URL: 'https://github.com/ravi-ivar-7/quickerp/issues',
-    DISCUSSIONS_URL: 'https://github.com/ravi-ivar-7/quickerp/discussions'
+    REPOSITORY_URL: 'https://github.com/iamrknain/quickerp',
+    ISSUES_URL: 'https://github.com/iamrknain/quickerp/issues',
+    DISCUSSIONS_URL: 'https://github.com/iamrknain/quickerp/discussions'
 };
 
 export const SITE_CONFIG = {

@@ -2,18 +2,6 @@ import { ERP_CONFIG, ERROR_MESSAGES } from '../config/constants.js';
 import { GmailService } from './GmailService.js';
 
 export class ERPApiService {
-    static async createSession() {
-        const response = await fetch(ERP_CONFIG.HOMEPAGE_URL, {
-            method: 'GET',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error(ERROR_MESSAGES.NETWORK_ERROR + ' - Status: ' + response.status);
-        }
-        return response;
-    }
-
     static async getSessionToken() {
         try {
             const response = await fetch(ERP_CONFIG.HOMEPAGE_URL, {
@@ -128,63 +116,6 @@ export class ERPApiService {
         }
     }
 
-    static parseSecurityQuestions(html) {
-        const questions = [];
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        const questionElements = doc.querySelectorAll('select[name^="security_question"]');
-        questionElements.forEach((select, index) => {
-            const selectedOption = select.querySelector('option:checked');
-            if (selectedOption && selectedOption.value) {
-                questions.push({
-                    id: index,
-                    question: selectedOption.textContent.trim(),
-                    name: select.name
-                });
-            }
-        });
-        
-        return questions;
-    }
-
-    static async submitSecurityAnswers(answers) {
-        try {
-            const formData = new FormData();
-            
-            answers.forEach(answer => {
-                formData.append(answer.name, answer.value);
-            });
-            
-            formData.append('submit', 'Submit');
-            
-            const response = await fetch(ERP_CONFIG.SECURITY_URL, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
-            }
-            
-            const text = await response.text();
-            
-            if (text.includes('Wrong Answer')) {
-                throw new Error('Incorrect security answers');
-            }
-            
-            if (text.includes('OTP')) {
-                return { success: true, requiresOTP: true, html: text };
-            }
-            
-            return { success: true, html: text };
-        } catch (error) {
-            console.error('Security answer submission failed:', error);
-            throw error;
-        }
-    }
-
     static async requestOTP(credentials, sessionToken, securityAnswer) {
         try {
             const loginDetails = {
@@ -244,6 +175,35 @@ export class ERPApiService {
         }
     }
 
+    static async _syncCookiesToBrowser() {
+        try {
+            if (!chrome.cookies) {
+                console.warn('chrome.cookies API not available. Did you add "cookies" to permissions?');
+                return;
+            }
+            const cookies = await chrome.cookies.getAll({ domain: 'erp.iitkgp.ac.in' });
+            for (const cookie of cookies) {
+                const newCookie = {
+                    url: 'https://erp.iitkgp.ac.in',
+                    name: cookie.name,
+                    value: cookie.value,
+                    path: cookie.path,
+                    secure: cookie.secure,
+                    httpOnly: cookie.httpOnly,
+                    sameSite: cookie.sameSite
+                };
+                if (!cookie.hostOnly) newCookie.domain = cookie.domain;
+                if (cookie.expirationDate) newCookie.expirationDate = cookie.expirationDate;
+                
+                // Writing to this URL without partitionKey sets it globally
+                await chrome.cookies.set(newCookie);
+                console.log('Synced cookie to main browser:', cookie.name);
+            }
+        } catch (err) {
+            console.error('Failed to sync cookies to main browser:', err);
+        }
+    }
+
     static async submitLogin(credentials, sessionToken, otp, securityAnswer) {
         try {
             const loginDetails = {
@@ -277,24 +237,6 @@ export class ERPApiService {
             
             const text = await response.text();
             
-            if (response.status === 302 || response.status === 301) {
-                const location = response.headers.get('Location');
-                
-                if (location && location.includes('ssoToken=')) {
-                    const ssoTokenMatch = location.match(/ssoToken=([^&]+)/);
-                    if (ssoTokenMatch) {
-                        return { success: true, ssoToken: ssoTokenMatch[1] };
-                    }
-                }
-            }
-            
-            if (response.url && response.url.includes('ssoToken=')) {
-                const ssoTokenMatch = response.url.match(/ssoToken=([^&]+)/);
-                if (ssoTokenMatch) {
-                    return { success: true, ssoToken: ssoTokenMatch[1] };
-                }
-            }
-            
             if (text.includes('ERROR:Email OTP mismatch')) {
                 throw new Error('Invalid OTP');
             }
@@ -307,48 +249,36 @@ export class ERPApiService {
                 throw new Error('Invalid security question answer');
             }
             
-            if (text.includes('Welcome to ERP') || text.includes('welcome.jsp') || text.includes('home.jsp') || 
-                text.includes('dashboard') || text.includes('Welcome') || text.includes('success')) {
+            // On successful auth, the server redirects to IIT_ERP3 pages.
+            // Since fetch follows redirects, response.url will be the final URL.
+            // Check if we landed on an IIT_ERP3 page (not back on the SSO login page).
+            const finalUrl = response.url || '';
+            if (
+                finalUrl.includes('IIT_ERP3') ||
+                finalUrl.includes('welcome.jsp') ||
+                finalUrl.includes('home.jsp')
+            ) {
+                await this._syncCookiesToBrowser();
                 
-                return { success: true, message: 'Login successful', welcomePage: true };
+                // Extract ssoToken from final URL if present
+                const ssoTokenMatch = finalUrl.match(/ssoToken=([^&]+)/);
+                return {
+                    success: true,
+                    message: 'Login successful',
+                    ssoToken: ssoTokenMatch ? ssoTokenMatch[1] : null
+                };
+            }
+
+            // Also check response body for authenticated page content
+            if (text.includes('Welcome to ERP') || text.includes('welcome.jsp') || text.includes('home.jsp') || 
+                text.includes('IIT_ERP3') || text.includes('logout') || text.includes('Logout')) {
+                await this._syncCookiesToBrowser();
+                return { success: true, message: 'Login successful' };
             }
             
-            throw new Error('Login failed - no success indicators found');
+            throw new Error('Login failed - redirected back to login page. Check your credentials or OTP.');
         } catch (error) {
             console.error('ERPApiService: Login submission failed:', error);
-            throw error;
-        }
-    }
-
-    static async submitOTP(otp) {
-        try {
-            const formData = new FormData();
-            formData.append('otp', otp);
-            formData.append('submit', 'Submit');
-            
-            const response = await fetch(ERP_CONFIG.VERIFY_URL, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-            
-            if (!response.ok) {
-                throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
-            }
-            
-            const text = await response.text();
-            
-            if (text.includes('Invalid OTP') || text.includes('OTP Expired')) {
-                throw new Error('Invalid or expired OTP');
-            }
-            
-            if (text.includes('welcome') || text.includes('dashboard')) {
-                return { success: true, loggedIn: true, html: text };
-            }
-            
-            return { success: true, html: text };
-        } catch (error) {
-            console.error('OTP submission failed:', error);
             throw error;
         }
     }
@@ -433,13 +363,16 @@ export class ERPApiService {
             let attempts = 0;
             const maxAttempts = 10;
             
+            // Capture time just before requesting OTP to filter out old emails
+            const otpRequestTime = Date.now();
+            
             while (attempts < maxAttempts) {
                 try {
                     const otp = await GmailService.getLatestOTP(10, 5000, (step, data) => {
                         if (step === 'polling') {
                             onProgress?.('polling', data);
                         }
-                    });
+                    }, otpRequestTime);
                     
                     onProgress?.('polling', {
                         message: 'Logging into ERP system...',
@@ -475,108 +408,10 @@ export class ERPApiService {
         }
     }
 
-    static async solveCaptcha(captchaUrl) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            
-            img.onload = () => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const captchaText = this.processCaptchaImage(imageData); 
-                    resolve(captchaText || '0000');
-                } catch (error) {
-                    console.error('ERPApiService: Captcha processing failed:', error);
-                    resolve('0000'); // Fallback
-                }
-            };
-            
-            img.onerror = (error) => {
-                console.error('ERPApiService: Failed to load captcha image:', error);
-                resolve('0000'); // Fallback
-            };
-            
-            img.src = captchaUrl;
-        });
-    }
-
-    static processCaptchaImage(imageData) {
-        const { data, width, height } = imageData;
-        let text = '';
-        
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const i = (y * width + x) * 4;
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                const brightness = (r + g + b) / 3;
-                
-                if (brightness < 128) {
-                    text += '1';
-                } else {
-                    text += '0';
-                }
-            }
-        }
-        
-        const patterns = {
-            '0': /111101101101111/,
-            '1': /001001001001001/,
-            '2': /111001111100111/,
-            '3': /111001111001111/,
-            '4': /101101111001001/,
-            '5': /111100111001111/,
-            '6': /111100111101111/,
-            '7': /111001001001001/,
-            '8': /111101111101111/,
-            '9': /111101111001111/
-        };
-        
-        let result = '';
-        for (let i = 0; i < 4; i++) {
-            const segment = text.substring(i * 15, (i + 1) * 15);
-            for (const [digit, pattern] of Object.entries(patterns)) {
-                if (pattern.test(segment)) {
-                    result += digit;
-                    break;
-                }
-            }
-        }
-        
-        return result.length === 4 ? result : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    }
-
-    static matchSecurityAnswers(questions, savedAnswers) {
-        return questions.map(question => {
-            const saved = savedAnswers.find(sa => {
-                const savedQ = sa.question.toLowerCase().trim();
-                const currentQ = question.question.toLowerCase().trim();
-                return savedQ === currentQ || 
-                       savedQ.includes(currentQ.substring(0, 15)) ||
-                       currentQ.includes(savedQ.substring(0, 15));
-            });
-            
-            return {
-                name: question.name,
-                value: saved?.answer || ''
-            };
-        });
-    }
-
     static async openAuthenticatedERP(session) {
         try {
-            const authenticatedUrl = `${ERP_CONFIG.HOMEPAGE_URL}?ssoToken=${session.ssoToken}`;
-            
-            const tab = await chrome.tabs.create({
-                url: authenticatedUrl,
-                active: true
-            });
+            const url = ERP_CONFIG.HOMEPAGE_URL;
+            const tab = await chrome.tabs.create({ url, active: true });
             return tab;
         } catch (error) {
             console.error('Failed to open ERP:', error);

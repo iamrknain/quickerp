@@ -191,30 +191,6 @@ export class SettingsController {
         }
     }
 
-    async reconnectGmail() {
-        try {
-            const button = document.getElementById('reconnect-gmail');
-            button.disabled = true;
-            button.textContent = 'Connecting...';
-            
-            await GmailService.disconnect();
-            const tokenData = await GmailService.authenticate();
-            
-            document.getElementById('gmail-email').textContent = tokenData.email;
-            button.textContent = 'Reconnect';
-            button.disabled = false;
-            
-            this.app.showSuccess('Gmail reconnected successfully');
-        } catch (error) {
-            console.error('Gmail reconnection failed:', error);
-            this.app.showError('Failed to reconnect Gmail');
-            
-            const button = document.getElementById('reconnect-gmail');
-            button.disabled = false;
-            button.textContent = 'Reconnect';
-        }
-    }
-
     toggleEditMode(field) {
         switch (field) {
             case 'roll':

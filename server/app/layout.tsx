@@ -102,7 +102,7 @@ const organizationStructuredData = {
     "contactType": "customer service"
   },
   "sameAs": [
-    "https://github.com/rknain/quickerp"
+    "https://github.com/iamrknain/quickerp"
   ]
 }
 

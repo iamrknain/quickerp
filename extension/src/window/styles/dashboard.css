@@ -867,6 +867,28 @@
     text-overflow: ellipsis;
 }
 
+/* Bottom Shortcut Tip */
+.bottom-shortcut-tip {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 16px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bottom-shortcut-tip kbd {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--text-primary);
+}
+
 /* Version Info */
 .version-info {
     display: flex;
