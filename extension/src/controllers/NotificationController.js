@@ -21,7 +21,6 @@ export class NotificationController {
             return;
         }
 
-        console.log('Setting up notification listeners');
         
         notificationBtn.addEventListener('click', async (e) => {
             e.stopPropagation();

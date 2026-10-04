@@ -197,7 +197,7 @@ export class ERPApiService {
                 
                 // Writing to this URL without partitionKey sets it globally
                 await chrome.cookies.set(newCookie);
-                console.log('Synced cookie to main browser:', cookie.name);
+                // Optional: handle successful sync
             }
         } catch (err) {
             console.error('Failed to sync cookies to main browser:', err);

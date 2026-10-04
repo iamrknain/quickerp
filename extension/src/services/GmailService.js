@@ -111,8 +111,7 @@ export class GmailService {
                     return userInfo;
                 }
             } catch (error) {
-                console.log('Endpoint failed:', endpoint, error);
-                continue;
+                // silently handle fallback                continue;
             }
         }
         
@@ -277,7 +276,7 @@ export class GmailService {
                         // Ensure we don't pick up an old OTP email from a previous login attempt
                         const emailDate = parseInt(emailContent.internalDate);
                         if (emailDate < minTime) {
-                            console.log('Skipping old OTP email from before this login attempt.');
+                            // silently skip old emails
                             throw new Error('Old OTP email'); 
                         }
                         
